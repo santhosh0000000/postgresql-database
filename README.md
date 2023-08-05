@@ -1,101 +1,21 @@
- #!/bin/bash
+ This bash script is designed to backup a PostgreSQL database on a Linux server. It creates a backup of a specified PostgreSQL database and stores it in a specific location. Here's a step-by-step breakdown of the script:
 
-# List all of the Psql databases that you want to backup in here,
-# Backup path
-backup_path="/tmp"
+Database Details and Backup Path: The script begins by defining the PostgreSQL database you want to backup, its connection details, and the path where the backup files will be stored.
 
-# Full PostgreSQL dump (All Databases)
-postgres_backup="yes"
-postgres_user="ssk"
-postgres_pass="sand"
-postgres_database="ssk"
-postgres_host="localhost"
-postgres_port="5432"
+Email Notification: There is an option to send an email after the backup process has been completed. You need to have sendmail or postfix installed for this to work.
 
-# Send an email the result of the backup process
-# You should have sendmail or postfix installed
-# Send Backup?  Would you like the backup emailed to you?
-# Set to "y" if you do
-send_email="no"
-subject="Backup is done"
-email_to="sahul.s@open-v.net"
+Timestamp: The script generates a timestamp that is used to name the backup folder and file.
 
-# Unix Commands
- 
-mail=/bin/mail
+Backup Start: The script then creates the backup directory and logs the start of the backup process.
 
-# Main variables
-color='\033[0;36m'
-color_fail='\033[0;31m'
-nc='\033[0m'
-hostname=$(hostname -s)
-date_now=$(date +"%Y-%m-%d %H:%M:%S")
+PostgreSQL Backup: If the postgres_backup variable is set to "yes", the script creates a pgpass file with the database connection details. This allows for passwordless connections to the database for the backup. The script then uses the pg_dump command to create a backup of the database and stores it in the backup directory.
 
-path_date=$(hostname -s)_$(date +"%Y-%m-%d-%H-%M-%S")
-mkdir -p $backup_path/Backup/$path_date 2>> $log_file
-echo -e "\n ${color}--- $date_now Backup started. \n${nc}"
-echo "$date_now Backup started." >> $log_file
+TAR File Creation: After the database backup, the script creates a compressed TAR file of the backup. The original backup file is then deleted, leaving only the compressed TAR file.
 
+Email Notification: If the send_email variable is set to "yes", the script sends an email with the subject and body defined earlier in the script.
 
+Cleanup: The script deletes backup files that are older than 30 days.
 
-# PostgreSQL backup
-if [ $postgres_backup = "yes" ]
-then
-    # Creating ~/.pgpass for PostgreSQL password
-    # PostgreSQL does not support inline password
-    # Know better solution? Let me know.
-    USERNAME=`whoami`
-    CUR_DATE=$(date +"%Y-%m-%d-%H-%M-%S")
-    if [ $USERNAME = "root" ]
-    then
-        echo "$postgres_host:$postgres_port:$postgres_database:$postgres_user:$postgres_pass" > /root/.pgpass
-        chmod 600 /root/.pgpass
-    else
-        echo "$postgres_host:$postgres_port:$postgres_database:$postgres_user:$postgres_pass" > /home/$USERNAME/.pgpass
-        chmod 600 /home/$USERNAME/.pgpass
-    fi
+Completion Message: Upon successfully completing the backup, the script prints a success message and lists the contents of the backup directory.
 
-    echo -e "\n ${color}--- $date_now PostgreSQL backup enabled, backing up: \n${nc}"
-    echo "$date_now PostgreSQL backup enabled, backing up" >> $log_file
-    # Using ionice for PostgreSQL dump
-    ionice -c 3 pg_dump -p $postgres_port -h $postgres_host -Fc -U $postgres_user $postgres_database > ${backup_path}/Backup/${path_date}/Postgres_Full_Dump_${path_date}.dump | tee -a $log_file
-    if [ $? -eq 0 ]
-    then
-        echo -e "\n ${color}--- $date_now PostgreSQL backup completed. \n${nc}"
-        echo "$date_now PostgreSQL backup completed" >> $log_file
-    fi
-fi
-
-sleep 1
-
-# Create TAR file
-echo -e "\n ${color}--- $date_now Creating TAR file located in $backup_path/Full_Backup_$path_date.tar.bz2 \n${nc}"
-echo "$date_now Creating TAR file located in $backup_path/Full_Backup_$path_date.tar.bz2" >> $log_file
-tar -cjf $backup_path/Full_Backup_${path_date}.tar.bz2 $backup_path/Backup/$path_date 2> /dev/null
-rm -rf $backup_path/Backup/
-final_archive="Full_Backup_${path_date}.tar.bz2"
-
-sleep 1
-
-# Send a simple email notification
-if [ $send_email = "yes" ]
-then
-   
-     $mail -s "$subject : $postgres_user" $email_to <Full_Backup_${path_date}.tar.bz2
-fi
-
-# print end status message
-echo "."
-echo "."
-echo "."
-echo "... Backup SUCCESS!"
-date
-echo ""
-echo "Delete old files !"
-find Full_Backup_${path_date} -mtime +30 -type f -delete
-echo ""
-
-# And we're done
-ls -l ${backup_path}
-echo "Dump Complete!"
-exit 
+Before running the script, replace the placeholder values with your actual database name, PostgreSQL credentials, email address, and other details as per your requirements. Also, ensure that the script has sufficient permissions to access the database and write to the backup directory. The script assumes that the pg_dump, tar, find, and mail commands are installed and accessible in the specified paths.
